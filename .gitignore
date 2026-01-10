@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+
+# Conda
+conda/
+.envs/
+
+# Experiments output (IMPORTANT)
+experiments/results/
+experiments/*.wav
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Model cache (VERY IMPORTANT)
+.cache/
+.cache/huggingface/
+.cache/torch/
+
+# Large files
+*.ckpt
+*.pt
+*.bin
