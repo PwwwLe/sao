@@ -1,3 +1,6 @@
+# IDEA
+.idea/
+
 # Python
 __pycache__/
 *.pyc
