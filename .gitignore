@@ -1,35 +1,28 @@
-# IDEA
-.idea/
-
-# Python
+# ===== Python =====
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.env
-.venv
 
-# Conda
-conda/
-.envs/
-
-# Experiments output (IMPORTANT)
+# ===== Experiment Outputs =====
 experiments/results/
 experiments/results_preliminary/
-experiments/*.wav
+metadata.csv
+prompt_ledger.jsonl
 
-# Logs
+# ===== Audio Files =====
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# ===== IDE =====
+.idea/
+.vscode/
+.pycharm_helpers/
+
+# ===== Logs =====
 *.log
 
-# OS
+# ===== OS =====
 .DS_Store
-
-# Model cache (VERY IMPORTANT)
-.cache/
-.cache/huggingface/
-.cache/torch/
-
-# Large files
-*.ckpt
-*.pt
-*.bin
+Thumbs.db
