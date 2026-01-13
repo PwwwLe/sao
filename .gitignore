@@ -12,6 +12,7 @@ conda/
 
 # Experiments output (IMPORTANT)
 experiments/results/
+experiments/results_preliminary/
 experiments/*.wav
 
 # Logs
