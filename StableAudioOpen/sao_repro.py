@@ -7,22 +7,6 @@ from prompt_linearizer import linearize_structured_prompt
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-import requests
-import json
-
-QWEN_SERVICE_URL = "http://127.0.0.1:8008/refine_prompt"
-
-
-def get_structured_prompt(raw_prompt: str) -> str:
-    payload = {
-        "raw_prompt": raw_prompt,
-        "max_new_tokens": 512
-    }
-    resp = requests.post(QWEN_SERVICE_URL, json=payload, timeout=120)
-    resp.raise_for_status()
-    return resp.json()["structured_prompt"]
-
-
 # Download model
 model, model_config = get_pretrained_model("stabilityai/stable-audio-open-1.0")
 sample_rate = model_config["sample_rate"]
@@ -31,14 +15,10 @@ sample_size = model_config["sample_size"]
 model = model.to(device)
 
 # Set up text and timing conditioning
-raw_prompt = "A luxurious Indietronica instrumental perfect for a perfume advertisement"
-
-structured_prompt = get_structured_prompt(raw_prompt)
-
-final_prompt = linearize_structured_prompt(structured_prompt)
+prompt = "Format: Solo | Genre: Foley | Sub-genre: UI SFX | Instruments: pure sine wave ping, metallic digital click, slight resonant tail | Moods: clean, precise, high-tech | Styles: Video Games, High Tech, Sci-Fi | Tempo: Medium | BPM: 120 | Details: 0.5 second one-shot, snappy envelope, decay quickly | Quality: high-quality, stereo"
 
 conditioning = [{
-    "prompt": final_prompt,
+    "prompt": prompt,
     "seconds_start": 0,
     "seconds_total": 30
 }]

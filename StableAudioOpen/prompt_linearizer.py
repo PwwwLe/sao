@@ -4,64 +4,50 @@ from json_sanitizer import extract_json_block
 
 def linearize_structured_prompt(structured_prompt: str) -> str:
     """
-    Convert structured audio schema into a natural language
-    prompt optimized for Stable Audio Open.
+    Convert structured schema into a single-line Stable Audio Open prompt.
+    Prefer a model-provided sao_prompt when available.
     """
 
     data: Dict[str, Any] = extract_json_block(structured_prompt)
-    segments = []
 
-    def add(sentence: str):
-        if sentence:
-            segments.append(sentence)
+    sao_prompt = str(data.get("sao_prompt", "")).strip()
+    if sao_prompt:
+        return sao_prompt
 
-    # Core audio description
-    if data.get("audio_type"):
-        add(f"This is a {data['audio_type']} audio scene")
+    def _get(name: str) -> str:
+        value = data.get(name, "")
+        return str(value).strip() if value is not None else ""
 
-    if data.get("sound_source"):
-        add(f"The sound source is {data['sound_source']}")
+    merged_instruments = ", ".join(
+        part for part in [
+            _get("instruments_primary"),
+            _get("instruments_supporting"),
+            _get("rhythm_components"),
+            _get("texture_elements"),
+        ]
+        if part
+    )
 
-    if data.get("sound_event"):
-        add(f"The sound event involves {data['sound_event']}")
+    details_merged = ", ".join(
+        part for part in [
+            _get("use_case"),
+            _get("production"),
+            _get("looping"),
+            _get("duration_hint"),
+            _get("details"),
+        ]
+        if part
+    )
 
-    if data.get("environment"):
-        add(f"The environment is {data['environment']}")
-
-    # Style & temporal attributes
-    if data.get("style"):
-        add(f"The overall style is {data['style']}")
-
-    if data.get("tempo"):
-        add(f"The tempo is {data['tempo']}")
-
-    if data.get("rhythm"):
-        add(f"The rhythm is {data['rhythm']}")
-
-    if data.get("mood"):
-        add(f"The mood is {data['mood']}")
-
-    # SAO-critical attributes
-    if data.get("texture"):
-        add(f"The texture is {data['texture']}")
-
-    if data.get("dynamics"):
-        add(f"The dynamics are {data['dynamics']}")
-
-    if data.get("spatial"):
-        add(f"The spatial characteristics are {data['spatial']}")
-
-    if data.get("structure"):
-        add(f"The structure is {data['structure']}")
-
-    # Usage & constraints
-    if data.get("production"):
-        add(f"The production style is {data['production']}")
-
-    if data.get("use_case"):
-        add(f"This audio is intended for {data['use_case']}")
-
-    if data.get("negative"):
-        add(f"Avoid the following elements: {data['negative']}")
-
-    return ". ".join(segments) + "."
+    return (
+        f"Format: {_get('format')} | "
+        f"Genre: {_get('genre')} | "
+        f"Sub-genre: {_get('sub_genre')} | "
+        f"Instruments: {merged_instruments} | "
+        f"Moods: {_get('moods')} | "
+        f"Styles: {_get('styles')} | "
+        f"Tempo: {_get('tempo')} | "
+        f"BPM: {_get('bpm')} | "
+        f"Details: {details_merged} | "
+        "Quality: high-quality, stereo"
+    )
