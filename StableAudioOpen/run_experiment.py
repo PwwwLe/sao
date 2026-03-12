@@ -1,3 +1,5 @@
+"""Batch experiment runner for raw vs structured SAO prompt generation."""
+
 import json
 import csv
 import os
@@ -29,6 +31,7 @@ MODES = ["raw", "structured_nl"]
 # =========================
 
 def get_structured_prompt(raw_prompt: str) -> str:
+    """Call the Qwen API and return the structured prompt text."""
     payload = {
         "raw_prompt": raw_prompt,
         "max_new_tokens": 512
@@ -39,6 +42,7 @@ def get_structured_prompt(raw_prompt: str) -> str:
 
 
 def load_prompts(path):
+    """Load prompt records from a JSONL file."""
     prompts = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -47,6 +51,7 @@ def load_prompts(path):
 
 
 def ensure_dirs():
+    """Create output directories for each experiment mode."""
     for mode in MODES:
         os.makedirs(os.path.join(OUT_ROOT, mode), exist_ok=True)
 
@@ -55,6 +60,7 @@ def ensure_dirs():
 # =========================
 
 def main():
+    """Run the full experiment loop and write outputs plus metadata."""
     ensure_dirs()
     prompts = load_prompts(PROMPT_FILE)
     generator = SAOGenerator()

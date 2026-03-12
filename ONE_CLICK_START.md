@@ -30,6 +30,11 @@ cd /Users/pwl/Develop/SAO/sao
 1. Qwen API: http://127.0.0.1:8008/docs
 2. Gradio UI: http://127.0.0.1:7860
 
+默认前端是“单服务双页面”：
+
+1. SAO Simple（单独 SAO 生成流程）
+2. Qwen + SAO Experiment（实验链路）
+
 ## 3. 常用命令
 
 ```bash
@@ -44,9 +49,10 @@ cd /Users/pwl/Develop/SAO/sao
 1. PYTHON_BIN: Python 可执行路径（默认 `python`）
 2. QWEN_HOST / QWEN_PORT: Qwen 监听地址和端口（默认 `0.0.0.0:8008`）
 3. GRADIO_HOST / GRADIO_PORT: Gradio 监听地址和端口（默认 `0.0.0.0:7860`）
-4. QWEN_SERVICE_URL: Gradio 调用 Qwen 的 URL（默认 `http://127.0.0.1:8008/refine_prompt`）
-5. QWEN_START_TIMEOUT: Qwen 启动等待秒数（默认 `600`）
-6. GRADIO_START_TIMEOUT: Gradio 启动等待秒数（默认 `60`）
+4. GRADIO_APP: Gradio 入口脚本（默认 `gradio_experiment_lab.py`）
+5. QWEN_SERVICE_URL: Gradio 调用 Qwen 的 URL（默认 `http://127.0.0.1:8008/refine_prompt`）
+6. QWEN_START_TIMEOUT: Qwen 启动等待秒数（默认 `600`）
+7. GRADIO_START_TIMEOUT: Gradio 启动等待秒数（默认 `60`）
 
 示例：
 
@@ -54,6 +60,7 @@ cd /Users/pwl/Develop/SAO/sao
 QWEN_PORT=8010 GRADIO_PORT=7861 ./labctl.sh start
 QWEN_START_TIMEOUT=1800 ./labctl.sh start
 PYTHON_BIN=/path/to/python ./labctl.sh start
+GRADIO_APP=gradio_lab.py ./labctl.sh start
 ```
 
 ## 5. 日志与运行文件
@@ -103,4 +110,5 @@ lsof -iTCP:8008 -sTCP:LISTEN -n -P
 ## 7. 实际启动入口
 
 1. Qwen 服务：[Qwen2AudioInstruct/qwen2audio_server.py](Qwen2AudioInstruct/qwen2audio_server.py)
-2. Gradio 前端：[StableAudioOpen/gradio_lab.py](StableAudioOpen/gradio_lab.py)
+2. Gradio 前端（默认）：[StableAudioOpen/gradio_experiment_lab.py](StableAudioOpen/gradio_experiment_lab.py)
+3. Gradio 前端（旧版可选）：[StableAudioOpen/gradio_lab.py](StableAudioOpen/gradio_lab.py)

@@ -1,3 +1,5 @@
+"""FastAPI service that compiles raw prompts into structured SAO prompt JSON."""
+
 import torch
 import os
 from fastapi import FastAPI
@@ -5,7 +7,7 @@ from pydantic import BaseModel
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 
 # =========================
-# 1. Load Model
+# 1. Load model
 # =========================
 
 MODEL_ID = os.environ.get("QWEN_MODEL_ID", "Qwen/Qwen2-Audio-7B-Instruct")
@@ -34,7 +36,7 @@ model = Qwen2AudioForConditionalGeneration.from_pretrained(
 model.eval()
 
 # =========================
-# 2. Prompt Schema & System Prompt (Revised for SAO Prompt-Compiler)
+# 2. Prompt schema and system prompt
 # =========================
 
 DEFAULT_PROMPT_SCHEMA = """
@@ -130,7 +132,7 @@ OUTPUT JSON SCHEMA:
 """
 
 # =========================
-# 3. FastAPI Initialization
+# 3. FastAPI initialization
 # =========================
 
 app = FastAPI(
@@ -139,27 +141,40 @@ app = FastAPI(
 )
 
 # =========================
-# 4. 请求体定义
+# 4. Request/response models
 # =========================
 
 class PromptRequest(BaseModel):
+    """Request payload for prompt refinement."""
+
     raw_prompt: str
     max_new_tokens: int = 512
     system_prompt: str | None = None
     prompt_schema: str | None = None
 
 class PromptResponse(BaseModel):
+    """Response payload containing structured prompt text."""
+
     structured_prompt: str
 
 
 # =========================
-# 5. 核心推理函数
+# 5. Core inference functions
 # =========================
 
 def build_system_prompt(
     system_prompt: str | None = None,
     prompt_schema: str | None = None
 ) -> str:
+    """Resolve the effective system prompt passed to Qwen.
+
+    Args:
+        system_prompt: Optional direct system prompt override.
+        prompt_schema: Optional JSON schema string used by the template.
+
+    Returns:
+        Final system prompt string.
+    """
     schema = prompt_schema or DEFAULT_PROMPT_SCHEMA
     if system_prompt:
         return system_prompt
@@ -172,6 +187,7 @@ def refine_prompt(
     system_prompt: str | None = None,
     prompt_schema: str | None = None
 ) -> str:
+    """Generate structured prompt text from a raw user prompt."""
     resolved_system_prompt = build_system_prompt(
         system_prompt=system_prompt,
         prompt_schema=prompt_schema
@@ -217,11 +233,12 @@ def refine_prompt(
 
 
 # =========================
-# 6. HTTP 接口
+# 6. HTTP endpoint
 # =========================
 
 @app.post("/refine_prompt", response_model=PromptResponse)
 def refine_prompt_api(req: PromptRequest):
+    """HTTP API for prompt refinement used by frontend applications."""
     structured = refine_prompt(
         raw_prompt=req.raw_prompt,
         max_new_tokens=req.max_new_tokens,

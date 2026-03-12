@@ -7,11 +7,13 @@ RUN_DIR="$ROOT_DIR/.run"
 LOG_DIR="$ROOT_DIR/experiments/logs"
 QWEN_DIR="$ROOT_DIR/Qwen2AudioInstruct"
 SAO_DIR="$ROOT_DIR/StableAudioOpen"
+QWEN_ENTRYPOINT="$QWEN_DIR/qwen2audio_server.py"
 
 QWEN_HOST="${QWEN_HOST:-0.0.0.0}"
 QWEN_PORT="${QWEN_PORT:-8008}"
 GRADIO_HOST="${GRADIO_HOST:-0.0.0.0}"
 GRADIO_PORT="${GRADIO_PORT:-7860}"
+GRADIO_APP="${GRADIO_APP:-gradio_experiment_lab.py}"
 QWEN_SERVICE_URL="${QWEN_SERVICE_URL:-http://127.0.0.1:${QWEN_PORT}/refine_prompt}"
 QWEN_START_TIMEOUT="${QWEN_START_TIMEOUT:-600}"
 GRADIO_START_TIMEOUT="${GRADIO_START_TIMEOUT:-60}"
@@ -48,8 +50,13 @@ Optional environment variables:
   QWEN_START_TIMEOUT Seconds to wait for Qwen startup (default: 600)
   GRADIO_HOST     Gradio server host (default: 0.0.0.0)
   GRADIO_PORT     Gradio server port (default: 7860)
+  GRADIO_APP      Gradio entrypoint under StableAudioOpen (default: gradio_experiment_lab.py)
   GRADIO_START_TIMEOUT Seconds to wait for Gradio startup (default: 60)
   QWEN_SERVICE_URL Override URL used by Gradio to call Qwen
+
+Notes:
+  - Default UI is unified multi-page frontend (SAO Simple + Qwen+SAO Experiment).
+  - You can switch to old UI by setting GRADIO_APP=gradio_lab.py.
 EOF
 }
 
@@ -72,6 +79,14 @@ ensure_command() {
   local cmd="$1"
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "[ERROR] Missing command: $cmd"
+    exit 1
+  fi
+}
+
+ensure_file_exists() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    echo "[ERROR] File not found: $file"
     exit 1
   fi
 }
@@ -193,6 +208,13 @@ print("[OK] Python dependency check passed")
 PY
 }
 
+show_launch_config() {
+  echo "[INFO] Launch config"
+  echo "       Python: $PYTHON_BIN"
+  echo "       Qwen:   $QWEN_HOST:$QWEN_PORT"
+  echo "       Gradio: $GRADIO_HOST:$GRADIO_PORT ($GRADIO_APP)"
+}
+
 wait_for_port() {
   local port="$1"
   local timeout_sec="$2"
@@ -230,6 +252,7 @@ start_qwen() {
   fi
 
   check_port_free "$QWEN_PORT" "Qwen"
+  ensure_file_exists "$QWEN_ENTRYPOINT"
 
   (
     cd "$QWEN_DIR"
@@ -262,13 +285,14 @@ start_gradio() {
   fi
 
   check_port_free "$GRADIO_PORT" "Gradio"
+  ensure_file_exists "$SAO_DIR/$GRADIO_APP"
 
   (
     cd "$SAO_DIR"
     QWEN_SERVICE_URL="$QWEN_SERVICE_URL" \
     GRADIO_SERVER_NAME="$GRADIO_HOST" \
     GRADIO_SERVER_PORT="$GRADIO_PORT" \
-    nohup "$PYTHON_BIN" gradio_lab.py >"$GRADIO_LOG" 2>&1 &
+    nohup "$PYTHON_BIN" "$GRADIO_APP" >"$GRADIO_LOG" 2>&1 &
     echo $! > "$GRADIO_PID_FILE"
   )
 
@@ -328,6 +352,7 @@ status_service() {
 cmd_start() {
   ensure_command lsof
   ensure_command "$PYTHON_BIN"
+  show_launch_config
   check_python_deps
   start_qwen
   start_gradio
@@ -336,6 +361,7 @@ cmd_start() {
   echo "[READY] Services are up"
   echo "Qwen API:    http://127.0.0.1:${QWEN_PORT}/docs"
   echo "Gradio Lab:  http://127.0.0.1:${GRADIO_PORT}"
+  echo "Gradio App:  $SAO_DIR/$GRADIO_APP"
   if [[ -n "$QWEN_LOCAL_MODEL_DIR" ]]; then
     echo "Qwen model:  $QWEN_LOCAL_MODEL_DIR"
   else
@@ -359,6 +385,7 @@ cmd_status() {
   resolve_qwen_local_model_dir
   status_service "Qwen" "$QWEN_PID_FILE" "$QWEN_PORT"
   status_service "Gradio" "$GRADIO_PID_FILE" "$GRADIO_PORT"
+  echo "Gradio app entry: $SAO_DIR/$GRADIO_APP"
   if [[ -n "$QWEN_LOCAL_MODEL_DIR" ]]; then
     echo "Qwen local model dir: $QWEN_LOCAL_MODEL_DIR"
   else
@@ -375,7 +402,12 @@ cmd_logs() {
 
 cmd_check() {
   ensure_command "$PYTHON_BIN"
+  ensure_file_exists "$QWEN_ENTRYPOINT"
+  ensure_file_exists "$SAO_DIR/$GRADIO_APP"
   check_python_deps
+  resolve_qwen_local_model_dir
+  validate_qwen_local_model_dir
+  echo "[OK] Script check passed"
 }
 
 ACTION="${1:-help}"

@@ -1,3 +1,5 @@
+"""Gradio frontend for standalone SAO generation and history browsing."""
+
 import json
 import os
 import random
@@ -35,11 +37,13 @@ _GENERATOR: SAOGenerator | None = None
 
 
 def ensure_dirs() -> None:
+    """Create output and history directories if they do not exist."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_generator() -> SAOGenerator:
+    """Return a cached SAOGenerator instance."""
     global _GENERATOR
     if _GENERATOR is None:
         _GENERATOR = SAOGenerator(device=os.environ.get("SAO_DEVICE", "auto"))
@@ -47,12 +51,14 @@ def get_generator() -> SAOGenerator:
 
 
 def append_history(entry: dict[str, Any]) -> None:
+    """Append one generation record to the JSONL history file."""
     ensure_dirs()
     with open(HISTORY_PATH, "a", encoding="utf-8") as history_file:
         history_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def load_history() -> list[dict[str, Any]]:
+    """Load history entries in reverse chronological order."""
     if not HISTORY_PATH.exists():
         return []
 
@@ -67,6 +73,7 @@ def load_history() -> list[dict[str, Any]]:
 
 
 def history_rows() -> list[list[Any]]:
+    """Convert history records to rows for the Gradio dataframe."""
     rows = []
     for item in load_history():
         rows.append(
@@ -86,10 +93,12 @@ def history_rows() -> list[list[Any]]:
 
 
 def history_choices() -> list[str]:
+    """Return run_id options for history dropdown widgets."""
     return [item["run_id"] for item in load_history()]
 
 
 def get_history_entry(run_id: str) -> dict[str, Any] | None:
+    """Find one history record by run identifier."""
     for item in load_history():
         if item["run_id"] == run_id:
             return item
@@ -97,10 +106,12 @@ def get_history_entry(run_id: str) -> dict[str, Any] | None:
 
 
 def random_seed_value() -> int:
+    """Generate a random positive 32-bit seed value."""
     return random.randint(1, 2**31 - 1)
 
 
 def refresh_history_view():
+    """Refresh history table and dropdown selection."""
     choices = history_choices()
     first = choices[0] if choices else None
     return (
@@ -110,6 +121,7 @@ def refresh_history_view():
 
 
 def load_history_item(run_id: str):
+    """Load selected history metadata and associated audio paths."""
     item = get_history_entry(run_id) if run_id else None
     if item is None:
         return {}, None, None
@@ -128,6 +140,7 @@ def run_generation(
     save_history: bool,
     progress=gr.Progress(track_tqdm=False),
 ):
+    """Generate one audio sample and optionally persist run history."""
     if not prompt or not prompt.strip():
         raise gr.Error("Prompt is required")
 
@@ -194,6 +207,7 @@ def run_generation(
 
 
 def build_app() -> gr.Blocks:
+    """Build and return the standalone SAO Gradio application."""
     ensure_dirs()
 
     with gr.Blocks(title="SAO Simple Generator") as demo:

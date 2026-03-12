@@ -1,3 +1,5 @@
+"""Standalone SAO reproduction script for quick local validation."""
+
 import torch
 import torchaudio
 from einops import rearrange
@@ -7,14 +9,14 @@ from prompt_linearizer import linearize_structured_prompt
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Download model
+# Load pretrained Stable Audio Open model and configuration.
 model, model_config = get_pretrained_model("stabilityai/stable-audio-open-1.0")
 sample_rate = model_config["sample_rate"]
 sample_size = model_config["sample_size"]
 
 model = model.to(device)
 
-# Set up text and timing conditioning
+# Build generation conditioning payload.
 prompt = "Format: Solo | Genre: Foley | Sub-genre: UI SFX | Instruments: pure sine wave ping, metallic digital click, slight resonant tail | Moods: clean, precise, high-tech | Styles: Video Games, High Tech, Sci-Fi | Tempo: Medium | BPM: 120 | Details: 0.5 second one-shot, snappy envelope, decay quickly | Quality: high-quality, stereo"
 
 conditioning = [{
@@ -24,7 +26,7 @@ conditioning = [{
 }]
 
 
-# Generate stereo audio
+# Generate stereo waveform.
 output = generate_diffusion_cond(
     model,
     steps=100,
@@ -37,7 +39,7 @@ output = generate_diffusion_cond(
     device=device
 )
 
-# Rearrange audio batch to a single sequence
+# Merge batch dimension into a single continuous sample sequence.
 output = rearrange(output, "b d n -> d (b n)")
 
 # Peak normalize, clip, convert to int16, and save to file

@@ -1,11 +1,17 @@
+"""Convert structured prompt JSON into a Stable Audio Open prompt string."""
+
 from typing import Dict, Any
 from json_sanitizer import extract_json_block
 
 
 def linearize_structured_prompt(structured_prompt: str) -> str:
-    """
-    Convert structured schema into a single-line Stable Audio Open prompt.
-    Prefer a model-provided sao_prompt when available.
+    """Build a one-line SAO prompt from structured JSON text.
+
+    Args:
+        structured_prompt: JSON text returned by Qwen prompt compiler.
+
+    Returns:
+        A normalized single-line prompt suitable for SAO generation.
     """
 
     data: Dict[str, Any] = extract_json_block(structured_prompt)

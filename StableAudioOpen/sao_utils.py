@@ -1,3 +1,5 @@
+"""Stable Audio Open generation utilities shared by experiment frontends."""
+
 import torch
 import torchaudio
 import soundfile as sf
@@ -7,7 +9,14 @@ from stable_audio_tools.inference.generation import generate_diffusion_cond
 
 
 class SAOGenerator:
+    """Lazy wrapper around the Stable Audio Open model and generation API."""
+
     def __init__(self, device="auto"):
+        """Initialize the SAO model on the selected device.
+
+        Args:
+            device: Device string or "auto" for CUDA/MPS/CPU auto-selection.
+        """
         if device == "auto":
             if torch.cuda.is_available():
                 device = "cuda"
@@ -36,6 +45,19 @@ class SAOGenerator:
         sigma_max: float = 500.0,
         sampler_type: str = "dpmpp-3m-sde",
     ):
+        """Generate audio with SAO and save it to disk.
+
+        Args:
+            prompt: Final SAO prompt string.
+            seconds: Audio duration in seconds.
+            seed: Random seed for deterministic generation.
+            out_path: Output WAV file path.
+            steps: Diffusion sampling steps.
+            cfg_scale: Classifier-free guidance scale.
+            sigma_min: Minimum sigma for sampler.
+            sigma_max: Maximum sigma for sampler.
+            sampler_type: Sampler algorithm name.
+        """
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
@@ -59,6 +81,7 @@ class SAOGenerator:
         )
 
         audio = rearrange(audio, "b d n -> d (b n)")
+        # Normalize to int16 PCM to keep output compatible with common audio players.
         audio = (
             audio.to(torch.float32)
             .div(torch.max(torch.abs(audio)))
@@ -71,6 +94,12 @@ class SAOGenerator:
         self._save_audio(out_path, audio)
 
     def _save_audio(self, out_path: str, audio: torch.Tensor) -> None:
+        """Save generated audio with torchaudio and fallback to soundfile.
+
+        Args:
+            out_path: Destination WAV file path.
+            audio: Audio tensor in shape [channels, samples].
+        """
         # torchaudio>=2.8 may require torchcodec for save(); fallback to soundfile.
         try:
             torchaudio.save(out_path, audio, self.sample_rate)
