@@ -4,10 +4,7 @@ __pycache__/
 *.pyo
 
 # ===== Experiment Outputs =====
-experiments/results/
-experiments/results_preliminary/
-metadata.csv
-prompt_ledger.jsonl
+experiments/
 
 # ===== Audio Files =====
 *.wav
