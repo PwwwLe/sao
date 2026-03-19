@@ -33,7 +33,7 @@ cd /Users/pwl/Develop/SAO/sao
 默认前端是“单服务双页面”：
 
 1. SAO Simple（单独 SAO 生成流程）
-2. Qwen + SAO Experiment（实验链路）
+2. Qwen + SAO Experiment（实验链路，含 SAO 多任务实验工作台）
 
 ## 3. 常用命令
 
@@ -53,6 +53,8 @@ cd /Users/pwl/Develop/SAO/sao
 5. QWEN_SERVICE_URL: Gradio 调用 Qwen 的 URL（默认 `http://127.0.0.1:8008/refine_prompt`）
 6. QWEN_START_TIMEOUT: Qwen 启动等待秒数（默认 `600`）
 7. GRADIO_START_TIMEOUT: Gradio 启动等待秒数（默认 `60`）
+
+8. SAO_BATCH_MAX_WORKERS: SAO 多任务实验工作台的并行 worker 数（默认 `2`）
 
 示例：
 
