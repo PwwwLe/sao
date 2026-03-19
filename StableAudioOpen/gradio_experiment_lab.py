@@ -3,8 +3,10 @@
 import json
 import os
 import random
+import threading
 import uuid
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,7 @@ OUTPUT_DIR = EXPERIMENT_DIR / "qwen_sao_outputs"
 HISTORY_PATH = EXPERIMENT_DIR / "qwen_sao_history.jsonl"
 SAO_OUTPUT_DIR = EXPERIMENT_DIR / "sao_ui_outputs"
 SAO_HISTORY_PATH = EXPERIMENT_DIR / "sao_ui_history.jsonl"
+SAO_BATCH_EXPORT_DIR = EXPERIMENT_DIR / "sao_batch_exports"
 
 QWEN_SERVICE_URL_DEFAULT = os.environ.get(
     "QWEN_SERVICE_URL",
@@ -79,8 +82,49 @@ _SAMPLER_OPTIONS = [
     "k-heun",
     "k-lms",
 ]
+_TASK_FILTER_OPTIONS = ["all", "queued", "running", "completed", "failed", "cancelled"]
 
 _GENERATOR: SAOGenerator | None = None
+_GENERATOR_LOCAL = threading.local()
+_BATCH_MANAGER: "BatchTaskManager | None" = None
+
+
+def utc_now() -> datetime:
+    """Return timezone-aware UTC timestamp."""
+    return datetime.now(timezone.utc)
+
+
+def isoformat_utc(dt: datetime | None) -> str | None:
+    """Convert UTC datetime to ISO8601 text."""
+    if dt is None:
+        return None
+    return dt.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def format_elapsed_seconds(started_at: datetime | None, ended_at: datetime | None) -> str:
+    """Return elapsed seconds as text when start/end timestamps exist."""
+    if started_at is None:
+        return ""
+    finished_at = ended_at or utc_now()
+    return f"{(finished_at - started_at).total_seconds():.2f}s"
+
+
+def sanitize_text(value: Any) -> str:
+    """Escape arbitrary values for simple HTML output."""
+    text = "" if value is None else str(value)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def audio_url(path: str | None) -> str | None:
+    """Return Gradio-served file URL for a saved audio path."""
+    if not path:
+        return None
+    return f"/gradio_api/file={path}"
 
 
 def ensure_dirs() -> None:
@@ -89,14 +133,24 @@ def ensure_dirs() -> None:
     HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     SAO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     SAO_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SAO_BATCH_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_generator() -> SAOGenerator:
-    """Return a cached SAOGenerator shared across requests."""
+    """Return a cached SAOGenerator shared across single-run requests."""
     global _GENERATOR
     if _GENERATOR is None:
         _GENERATOR = SAOGenerator(device=os.environ.get("SAO_DEVICE", "auto"))
     return _GENERATOR
+
+
+def get_worker_generator() -> SAOGenerator:
+    """Return a thread-local SAOGenerator for batch worker threads."""
+    generator = getattr(_GENERATOR_LOCAL, "generator", None)
+    if generator is None:
+        generator = SAOGenerator(device=os.environ.get("SAO_DEVICE", "auto"))
+        _GENERATOR_LOCAL.generator = generator
+    return generator
 
 
 def build_system_prompt(system_prompt_template: str, prompt_schema: str) -> str:
@@ -269,6 +323,398 @@ def load_sao_history_run(run_id: str):
 def random_seed_value() -> int:
     """Generate a random positive 32-bit seed value."""
     return random.randint(1, 2**31 - 1)
+
+
+class BatchTaskManager:
+    """In-memory batch scheduler for multi-prompt SAO experiments."""
+
+    def __init__(self, max_workers: int):
+        self.max_workers = max_workers
+        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="sao-batch")
+        self.lock = threading.RLock()
+        self.tasks: dict[str, dict[str, Any]] = {}
+        self.batches: dict[str, list[str]] = {}
+
+    def submit_batch(
+        self,
+        prompts: list[str],
+        seconds: int,
+        seed: int,
+        steps: int,
+        cfg_scale: float,
+        sigma_min: float,
+        sigma_max: float,
+        sampler_type: str,
+        experiment_group: str,
+        note: str,
+        save_history: bool,
+    ) -> str:
+        batch_id = utc_now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
+        submitted_at = utc_now()
+        task_ids: list[str] = []
+
+        for index, prompt in enumerate(prompts, start=1):
+            task_id = f"{batch_id}-t{index:03d}"
+            audio_path = str(SAO_OUTPUT_DIR / batch_id / f"{task_id}.wav")
+            task = {
+                "task_id": task_id,
+                "batch_id": batch_id,
+                "prompt": prompt,
+                "experiment_group": experiment_group,
+                "note": note,
+                "status": "queued",
+                "submitted_at": submitted_at,
+                "started_at": None,
+                "ended_at": None,
+                "duration_seconds": seconds,
+                "seed": int(seed) + (index - 1),
+                "steps": int(steps),
+                "cfg_scale": float(cfg_scale),
+                "sigma_min": float(sigma_min),
+                "sigma_max": float(sigma_max),
+                "sampler_type": sampler_type,
+                "save_history": bool(save_history),
+                "audio_path": audio_path,
+                "error": "",
+                "result_ready": False,
+            }
+            with self.lock:
+                self.tasks[task_id] = task
+                self.batches.setdefault(batch_id, []).append(task_id)
+            task_ids.append(task_id)
+            self.executor.submit(self._run_task, task_id)
+
+        return batch_id
+
+    def _run_task(self, task_id: str) -> None:
+        with self.lock:
+            task = self.tasks.get(task_id)
+            if task is None or task["status"] != "queued":
+                return
+            task["status"] = "running"
+            task["started_at"] = utc_now()
+            task["error"] = ""
+
+        try:
+            output_path = Path(task["audio_path"])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            generator = get_worker_generator()
+            generator.generate(
+                prompt=task["prompt"],
+                seconds=task["duration_seconds"],
+                seed=task["seed"],
+                out_path=str(output_path),
+                steps=task["steps"],
+                cfg_scale=task["cfg_scale"],
+                sigma_min=task["sigma_min"],
+                sigma_max=task["sigma_max"],
+                sampler_type=task["sampler_type"],
+            )
+        except Exception as exc:
+            with self.lock:
+                latest = self.tasks.get(task_id)
+                if latest is None:
+                    return
+                latest["status"] = "failed"
+                latest["ended_at"] = utc_now()
+                latest["error"] = str(exc)
+            return
+
+        with self.lock:
+            latest = self.tasks.get(task_id)
+            if latest is None:
+                return
+            latest["status"] = "completed"
+            latest["ended_at"] = utc_now()
+            latest["result_ready"] = True
+            history_entry = self._task_metadata(latest)
+
+        if history_entry["save_history"]:
+            append_sao_history(history_entry)
+
+    def _task_metadata(self, task: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "run_id": task["task_id"],
+            "task_id": task["task_id"],
+            "batch_id": task["batch_id"],
+            "created_at": isoformat_utc(task["submitted_at"]),
+            "submitted_at": isoformat_utc(task["submitted_at"]),
+            "started_at": isoformat_utc(task["started_at"]),
+            "ended_at": isoformat_utc(task["ended_at"]),
+            "elapsed": format_elapsed_seconds(task["started_at"], task["ended_at"]),
+            "prompt": task["prompt"],
+            "experiment_group": task["experiment_group"],
+            "note": task["note"],
+            "status": task["status"],
+            "seconds": task["duration_seconds"],
+            "seed": task["seed"],
+            "steps": task["steps"],
+            "cfg_scale": task["cfg_scale"],
+            "sigma_min": task["sigma_min"],
+            "sigma_max": task["sigma_max"],
+            "sampler_type": task["sampler_type"],
+            "audio_path": task["audio_path"],
+            "storage_dir": str(Path(task["audio_path"]).parent),
+            "error": task["error"],
+            "save_history": task["save_history"],
+        }
+
+    def batch_choices(self) -> list[str]:
+        with self.lock:
+            return sorted(self.batches.keys(), reverse=True)
+
+    def batch_summary(self, batch_id: str | None) -> dict[str, Any]:
+        tasks = self.tasks_for_batch(batch_id)
+        counts: dict[str, int] = {status: 0 for status in _TASK_FILTER_OPTIONS if status != "all"}
+        for task in tasks:
+            counts[task["status"]] = counts.get(task["status"], 0) + 1
+        return {
+            "batch_id": batch_id or "",
+            "total": len(tasks),
+            "queued": counts.get("queued", 0),
+            "running": counts.get("running", 0),
+            "completed": counts.get("completed", 0),
+            "failed": counts.get("failed", 0),
+            "cancelled": counts.get("cancelled", 0),
+            "max_workers": self.max_workers,
+        }
+
+    def tasks_for_batch(self, batch_id: str | None, status_filter: str = "all") -> list[dict[str, Any]]:
+        with self.lock:
+            task_ids = list(self.batches.get(batch_id, [])) if batch_id else []
+            tasks = [dict(self.tasks[task_id]) for task_id in task_ids if task_id in self.tasks]
+        tasks.sort(key=lambda item: (item["submitted_at"], item["task_id"]))
+        if status_filter != "all":
+            tasks = [item for item in tasks if item["status"] == status_filter]
+        return tasks
+
+    def cancel_waiting(self, batch_id: str | None) -> int:
+        changed = 0
+        with self.lock:
+            for task_id in self.batches.get(batch_id, []):
+                task = self.tasks.get(task_id)
+                if task and task["status"] == "queued":
+                    task["status"] = "cancelled"
+                    task["ended_at"] = utc_now()
+                    task["error"] = "Cancelled before execution"
+                    changed += 1
+        return changed
+
+    def clear_completed(self, batch_id: str | None) -> int:
+        removed = 0
+        with self.lock:
+            task_ids = self.batches.get(batch_id, [])
+            kept: list[str] = []
+            for task_id in task_ids:
+                task = self.tasks.get(task_id)
+                if task and task["status"] == "completed":
+                    self.tasks.pop(task_id, None)
+                    removed += 1
+                else:
+                    kept.append(task_id)
+            if batch_id in self.batches:
+                self.batches[batch_id] = kept
+        return removed
+
+    def retry_failed(self, batch_id: str | None) -> int:
+        failed_tasks = self.tasks_for_batch(batch_id, status_filter="failed")
+        if not failed_tasks:
+            return 0
+        for task in failed_tasks:
+            retry_task_id = f"{task['task_id']}-retry-{uuid.uuid4().hex[:4]}"
+            retry_audio_path = str(Path(task["audio_path"]).with_name(f"{retry_task_id}.wav"))
+            new_task = {
+                **task,
+                "task_id": retry_task_id,
+                "status": "queued",
+                "submitted_at": utc_now(),
+                "started_at": None,
+                "ended_at": None,
+                "audio_path": retry_audio_path,
+                "error": "",
+                "result_ready": False,
+            }
+            with self.lock:
+                self.tasks[retry_task_id] = new_task
+                self.batches.setdefault(task["batch_id"], []).append(retry_task_id)
+            self.executor.submit(self._run_task, retry_task_id)
+        return len(failed_tasks)
+
+    def export_batch(self, batch_id: str | None) -> str | None:
+        if not batch_id:
+            return None
+        tasks = [self._task_metadata(task) for task in self.tasks_for_batch(batch_id)]
+        if not tasks:
+            return None
+        export_path = SAO_BATCH_EXPORT_DIR / f"{batch_id}.json"
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(export_path, "w", encoding="utf-8") as export_file:
+            json.dump({"batch_id": batch_id, "tasks": tasks}, export_file, ensure_ascii=False, indent=2)
+        return str(export_path)
+
+
+def get_batch_manager() -> BatchTaskManager:
+    """Return the singleton multi-task batch manager."""
+    global _BATCH_MANAGER
+    if _BATCH_MANAGER is None:
+        max_workers = max(1, int(os.environ.get("SAO_BATCH_MAX_WORKERS", "2")))
+        _BATCH_MANAGER = BatchTaskManager(max_workers=max_workers)
+    return _BATCH_MANAGER
+
+
+def parse_prompt_lines(prompt_text: str) -> list[str]:
+    """Parse multi-line prompt input, keeping one non-empty prompt per line."""
+    prompts = [line.strip() for line in prompt_text.splitlines() if line.strip()]
+    if not prompts:
+        raise gr.Error("Please provide at least one prompt (one prompt per line).")
+    return prompts
+
+
+def experiment_table_value(raw_text: str, group: str, note: str) -> list[list[str]]:
+    """Render prompt input into a lightweight preview table."""
+    prompts = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    rows = []
+    for index, prompt in enumerate(prompts, start=1):
+        rows.append([str(index), prompt, group, note])
+    return rows
+
+
+def build_task_rows(tasks: list[dict[str, Any]]) -> list[list[Any]]:
+    """Convert task metadata to dataframe rows."""
+    rows = []
+    for task in tasks:
+        rows.append(
+            [
+                task["task_id"],
+                task["prompt"],
+                task["status"],
+                isoformat_utc(task["submitted_at"]),
+                isoformat_utc(task["started_at"]),
+                isoformat_utc(task["ended_at"]),
+                format_elapsed_seconds(task["started_at"], task["ended_at"]),
+                task["audio_path"] if task["status"] == "completed" else "",
+                task["error"],
+                task["experiment_group"],
+                task["note"],
+            ]
+        )
+    return rows
+
+
+def build_results_html(tasks: list[dict[str, Any]]) -> str:
+    """Render completed task results as comparable audio cards."""
+    completed = [task for task in tasks if task["status"] == "completed" and task["audio_path"]]
+    if not completed:
+        return (
+            "<div class='result-empty'>No completed results yet. "
+            "Submitted tasks will appear here as soon as each audio file is ready.</div>"
+        )
+
+    cards = []
+    for task in completed:
+        src = audio_url(task["audio_path"])
+        cards.append(
+            "<div class='result-card'>"
+            f"<div class='result-card-header'><strong>{sanitize_text(task['task_id'])}</strong>"
+            f" <span class='status-pill status-{sanitize_text(task['status'])}'>{sanitize_text(task['status'])}</span></div>"
+            f"<div class='result-meta'><strong>Batch:</strong> {sanitize_text(task['batch_id'])}</div>"
+            f"<div class='result-meta'><strong>Group:</strong> {sanitize_text(task['experiment_group'] or '-')}</div>"
+            f"<div class='result-prompt'>{sanitize_text(task['prompt'])}</div>"
+            f"<audio controls preload='none' src='{sanitize_text(src)}'></audio>"
+            f"<div class='result-meta'><strong>File:</strong> {sanitize_text(task['audio_path'])}</div>"
+            "</div>"
+        )
+    return "<div class='results-grid'>" + "".join(cards) + "</div>"
+
+
+def build_status_markdown(summary: dict[str, Any]) -> str:
+    """Render batch counters for the experiment dashboard."""
+    if not summary["batch_id"]:
+        return "No batch selected. Submit prompts to create an experiment batch."
+    return (
+        f"**Batch:** `{summary['batch_id']}`  \n"
+        f"**Workers:** {summary['max_workers']}  \n"
+        f"**Total:** {summary['total']} | **Queued:** {summary['queued']} | **Running:** {summary['running']} | "
+        f"**Completed:** {summary['completed']} | **Failed:** {summary['failed']} | **Cancelled:** {summary['cancelled']}"
+    )
+
+
+def update_batch_dashboard(batch_id: str | None, status_filter: str) -> tuple[Any, ...]:
+    """Refresh batch selector, queue table, status panel, results, and export file."""
+    manager = get_batch_manager()
+    choices = manager.batch_choices()
+    selected = batch_id if batch_id in choices else (choices[0] if choices else None)
+    tasks = manager.tasks_for_batch(selected, status_filter=status_filter)
+    summary = manager.batch_summary(selected)
+    export_path = manager.export_batch(selected)
+    status_text = build_status_markdown(summary)
+    return (
+        gr.update(choices=choices, value=selected),
+        gr.update(value=build_task_rows(tasks)),
+        status_text,
+        build_results_html(manager.tasks_for_batch(selected)),
+        export_path,
+        summary,
+    )
+
+
+def submit_sao_batch(
+    prompt_batch_text: str,
+    experiment_group: str,
+    note: str,
+    seconds: int,
+    seed: int,
+    steps: int,
+    cfg_scale: float,
+    sigma_min: float,
+    sigma_max: float,
+    sampler_type: str,
+    save_history: bool,
+):
+    """Create a new SAO experiment batch and enqueue one task per prompt."""
+    prompts = parse_prompt_lines(prompt_batch_text)
+    batch_id = get_batch_manager().submit_batch(
+        prompts=prompts,
+        seconds=seconds,
+        seed=seed,
+        steps=steps,
+        cfg_scale=cfg_scale,
+        sigma_min=sigma_min,
+        sigma_max=sigma_max,
+        sampler_type=sampler_type,
+        experiment_group=experiment_group.strip(),
+        note=note.strip(),
+        save_history=save_history,
+    )
+    prompt_table = [[str(index), prompt, experiment_group.strip(), note.strip()] for index, prompt in enumerate(prompts, start=1)]
+    dashboard = update_batch_dashboard(batch_id, "all")
+    return (batch_id, prompt_table, *dashboard)
+
+
+def cancel_waiting_tasks(batch_id: str | None, status_filter: str):
+    """Cancel queued tasks in the selected batch."""
+    if batch_id:
+        get_batch_manager().cancel_waiting(batch_id)
+    return update_batch_dashboard(batch_id, status_filter)
+
+
+def retry_failed_tasks(batch_id: str | None, status_filter: str):
+    """Re-enqueue failed tasks in the selected batch."""
+    if batch_id:
+        get_batch_manager().retry_failed(batch_id)
+    return update_batch_dashboard(batch_id, status_filter)
+
+
+def clear_completed_tasks(batch_id: str | None, status_filter: str):
+    """Remove completed tasks from the active dashboard while keeping files on disk."""
+    if batch_id:
+        get_batch_manager().clear_completed(batch_id)
+    return update_batch_dashboard(batch_id, status_filter)
+
+
+def export_selected_batch(batch_id: str | None, status_filter: str):
+    """Refresh export artifact for the selected batch."""
+    return update_batch_dashboard(batch_id, status_filter)
 
 
 def run_sao_generation(
@@ -480,16 +926,74 @@ def run_experiment(
     )
 
 
+def sao_workbench_css() -> str:
+    """Return lightweight styles for the experiment-oriented SAO workbench."""
+    return """
+    .result-empty {
+        padding: 16px;
+        border: 1px dashed #999;
+        border-radius: 12px;
+        color: #666;
+        background: rgba(0, 0, 0, 0.03);
+    }
+    .results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+    }
+    .result-card {
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 12px;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .result-card audio {
+        width: 100%;
+    }
+    .result-card-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+    }
+    .result-prompt {
+        font-size: 0.92rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .result-meta {
+        color: #555;
+        font-size: 0.85rem;
+        word-break: break-all;
+    }
+    .status-pill {
+        font-size: 0.78rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e5e7eb;
+    }
+    .status-completed { background: #dcfce7; }
+    .status-running { background: #dbeafe; }
+    .status-failed { background: #fee2e2; }
+    .status-queued { background: #fef3c7; }
+    .status-cancelled { background: #e5e7eb; }
+    """
+
+
 def build_app() -> gr.Blocks:
     """Build and return the unified multi-page Gradio app."""
     ensure_dirs()
 
-    with gr.Blocks(title="Qwen + SAO Experiment Lab") as demo:
+    with gr.Blocks(title="Qwen + SAO Experiment Lab", css=sao_workbench_css()) as demo:
         gr.Markdown(
             """
             # Qwen + SAO Experiment Lab
             One service with two pages:
-            1) SAO-only quick generation
+            1) SAO-only quick generation + multi-task experiment workbench
             2) Qwen-to-SAO experiment workflow
             """
         )
@@ -529,6 +1033,157 @@ def build_app() -> gr.Blocks:
 
                 sao_random_seed_button.click(fn=random_seed_value, outputs=sao_seed)
 
+            with gr.Tab("Experiment Workbench"):
+                gr.Markdown(
+                    """
+                    ### Multi-prompt SAO experiment workbench
+                    - 每行一个 prompt，提交后会拆成独立任务。
+                    - 队列表格会持续刷新，已完成任务会立即出现在下方结果区。
+                    - 导出文件会保存本批次 prompt、状态、时间、输出路径与错误信息。
+                    """
+                )
+                batch_state = gr.State(value=None)
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        prompt_batch_text = gr.Textbox(
+                            label="Batch Prompts (one prompt per line)",
+                            lines=10,
+                            value="\n".join([
+                                _DEFAULT_SAO_PROMPT,
+                                "Format: Solo | Genre: Ambient | Sub-genre: Texture | Instruments: warm pad, airy noise | Moods: calm, floating | Styles: cinematic, minimal | Tempo: Slow | BPM: 70 | Details: evolving airy motion | Quality: high-quality, stereo",
+                            ]),
+                        )
+                        experiment_group = gr.Textbox(label="Experiment Group", placeholder="例如 baseline / prompt-v2")
+                        experiment_note = gr.Textbox(label="Batch Note", lines=3, placeholder="记录本批次的实验目的、控制变量或备注")
+                        prompt_table_preview = gr.Dataframe(
+                            headers=["row", "prompt", "group", "note"],
+                            value=experiment_table_value(
+                                "\n".join([
+                                    _DEFAULT_SAO_PROMPT,
+                                    "Format: Solo | Genre: Ambient | Sub-genre: Texture | Instruments: warm pad, airy noise | Moods: calm, floating | Styles: cinematic, minimal | Tempo: Slow | BPM: 70 | Details: evolving airy motion | Quality: high-quality, stereo",
+                                ]),
+                                "",
+                                "",
+                            ),
+                            interactive=False,
+                            wrap=True,
+                            label="Prompt Preview",
+                        )
+                        submit_batch_button = gr.Button("Submit Batch", variant="primary")
+
+                    with gr.Column(scale=1):
+                        batch_status = gr.Markdown(value="No batch selected. Submit prompts to create an experiment batch.")
+                        batch_selector = gr.Dropdown(label="Experiment Batch", choices=[])
+                        status_filter = gr.Radio(label="Status Filter", choices=_TASK_FILTER_OPTIONS, value="all")
+                        export_file = gr.File(label="Batch Metadata Export (JSON)")
+                        batch_summary_json = gr.JSON(label="Batch Summary")
+                        with gr.Row():
+                            cancel_waiting_button = gr.Button("Cancel Waiting")
+                            retry_failed_button = gr.Button("Retry Failed")
+                            clear_completed_button = gr.Button("Clear Completed")
+                        export_button = gr.Button("Refresh Export")
+
+                queue_table = gr.Dataframe(
+                    headers=[
+                        "task_id",
+                        "prompt",
+                        "status",
+                        "submitted_at",
+                        "started_at",
+                        "ended_at",
+                        "elapsed",
+                        "audio_path",
+                        "error",
+                        "group",
+                        "note",
+                    ],
+                    value=[],
+                    interactive=False,
+                    wrap=True,
+                    label="Task Queue",
+                )
+                results_html = gr.HTML(value=build_results_html([]), label="Completed Results")
+                refresh_timer = gr.Timer(value=2.0)
+
+                prompt_batch_text.change(
+                    fn=experiment_table_value,
+                    inputs=[prompt_batch_text, experiment_group, experiment_note],
+                    outputs=prompt_table_preview,
+                )
+                experiment_group.change(
+                    fn=experiment_table_value,
+                    inputs=[prompt_batch_text, experiment_group, experiment_note],
+                    outputs=prompt_table_preview,
+                )
+                experiment_note.change(
+                    fn=experiment_table_value,
+                    inputs=[prompt_batch_text, experiment_group, experiment_note],
+                    outputs=prompt_table_preview,
+                )
+
+                submit_batch_button.click(
+                    fn=submit_sao_batch,
+                    inputs=[
+                        prompt_batch_text,
+                        experiment_group,
+                        experiment_note,
+                        sao_seconds,
+                        sao_seed,
+                        sao_steps,
+                        sao_cfg_scale,
+                        sao_sigma_min,
+                        sao_sigma_max,
+                        sao_sampler_type,
+                        sao_save_history,
+                    ],
+                    outputs=[
+                        batch_state,
+                        prompt_table_preview,
+                        batch_selector,
+                        queue_table,
+                        batch_status,
+                        results_html,
+                        export_file,
+                        batch_summary_json,
+                    ],
+                )
+
+                status_filter.change(
+                    fn=update_batch_dashboard,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+                batch_selector.change(
+                    fn=update_batch_dashboard,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+                refresh_timer.tick(
+                    fn=update_batch_dashboard,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+                cancel_waiting_button.click(
+                    fn=cancel_waiting_tasks,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+                retry_failed_button.click(
+                    fn=retry_failed_tasks,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+                clear_completed_button.click(
+                    fn=clear_completed_tasks,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+                export_button.click(
+                    fn=export_selected_batch,
+                    inputs=[batch_selector, status_filter],
+                    outputs=[batch_selector, queue_table, batch_status, results_html, export_file, batch_summary_json],
+                )
+
             with gr.Tab("History"):
                 sao_refresh_button = gr.Button("Refresh History")
                 sao_history_table = gr.Dataframe(
@@ -564,7 +1219,6 @@ def build_app() -> gr.Blocks:
                     outputs=[sao_history_metadata, sao_history_audio, sao_history_file],
                 )
 
-                # connect generation output to history widgets after they are defined
                 sao_generate_button.click(
                     fn=run_sao_generation,
                     inputs=[
@@ -705,8 +1359,9 @@ def build_app() -> gr.Blocks:
 
 if __name__ == "__main__":
     app = build_app()
-    app.queue(default_concurrency_limit=1)
+    app.queue(default_concurrency_limit=8)
     app.launch(
         server_name=os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0"),
         server_port=int(os.environ.get("GRADIO_SERVER_PORT", os.environ.get("GRADIO_EXPERIMENT_PORT", "7860"))),
+        allowed_paths=[str(EXPERIMENT_DIR)],
     )
