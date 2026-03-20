@@ -1,0 +1,34 @@
+[
+  {
+    "id": "forest_dawn",
+    "prompt": "A peaceful forest ambience at dawn with soft birdsong, light wind through leaves, and a distant creek."
+  },
+  {
+    "id": "rain_rooftop",
+    "prompt": "Continuous evening rain falling on a rooftop with occasional gutter drips and distant thunder."
+  },
+  {
+    "id": "city_night",
+    "prompt": "Urban night ambience with distant traffic, faint sirens, crosswalk beeps, and a steady low city hum."
+  },
+  {
+    "id": "office_open_plan",
+    "prompt": "Open-plan office room tone with soft keyboard typing, HVAC hum, chair movement, and distant conversation."
+  },
+  {
+    "id": "cave_drips",
+    "prompt": "A large cave ambience with echoing water drips, deep room resonance, and slow subterranean wind."
+  },
+  {
+    "id": "metro_platform",
+    "prompt": "Underground metro platform ambience with train ventilation, PA announcements, footsteps, and rail noise in the distance."
+  },
+  {
+    "id": "coastal_storm",
+    "prompt": "A stormy coastline with crashing waves, heavy wind, and occasional seabirds fighting the weather."
+  },
+  {
+    "id": "mountain_camp",
+    "prompt": "Quiet mountain campsite ambience at night with a small campfire, light insects, and faraway owl calls."
+  }
+]

@@ -1,0 +1,28 @@
+project_root: .
+prompts_file: prompts/raw_prompts.json
+outputs_root: outputs
+metrics_file: metrics/results.csv
+sample_rate: 44100
+duration_seconds: 30
+num_seeds: 5
+seed_offset: 1000
+random_seed: 1234
+device: auto
+model_name: stabilityai/stable-audio-open-1.0
+sampler:
+  steps: 100
+  cfg_scale: 7.0
+  sigma_min: 0.3
+  sigma_max: 500.0
+  sampler_type: dpmpp-3m-sde
+metrics:
+  fad_background_dir: null
+  clap_model_name: laion/clap-htsat-unfused
+  batch_size: 4
+conditions:
+  baseline:
+    enabled: true
+  structured:
+    enabled: true
+  cot:
+    enabled: true

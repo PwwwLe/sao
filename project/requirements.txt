@@ -1,0 +1,11 @@
+stable-audio-tools
+stable-audio-metrics
+transformers>=4.45.0
+torch
+torchaudio
+librosa
+soundfile
+numpy
+pandas
+pyyaml
+tqdm
