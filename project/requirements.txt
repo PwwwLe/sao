@@ -9,3 +9,4 @@ numpy
 pandas
 pyyaml
 tqdm
+requests

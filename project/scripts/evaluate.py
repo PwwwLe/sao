@@ -29,17 +29,14 @@ class AudioMetrics:
     fad: float | None
 
 
-
 def rms_loudness_variance(audio: np.ndarray, frame_length: int = 2048, hop_length: int = 512) -> float:
     rms = librosa.feature.rms(y=audio, frame_length=frame_length, hop_length=hop_length)[0]
     return float(np.var(rms))
 
 
-
 def spectral_centroid_variance(audio: np.ndarray, sample_rate: int, hop_length: int = 512) -> float:
     centroids = librosa.feature.spectral_centroid(y=audio, sr=sample_rate, hop_length=hop_length)[0]
     return float(np.var(centroids))
-
 
 
 def embedding_similarity_score(audio_path: Path, prompt: str) -> float | None:
@@ -53,7 +50,6 @@ def embedding_similarity_score(audio_path: Path, prompt: str) -> float | None:
     if isinstance(score, (list, tuple, np.ndarray)):
         return float(np.asarray(score).mean())
     return float(score)
-
 
 
 def fad_score(audio_paths: Iterable[Path], background_dir: Path | None = None) -> float | None:
@@ -75,7 +71,6 @@ def fad_score(audio_paths: Iterable[Path], background_dir: Path | None = None) -
     return None
 
 
-
 def compute_audio_metrics(audio_path: Path, prompt: str) -> AudioMetrics:
     audio, sample_rate = sf.read(audio_path)
     if audio.ndim > 1:
@@ -86,7 +81,6 @@ def compute_audio_metrics(audio_path: Path, prompt: str) -> AudioMetrics:
         embedding_similarity=embedding_similarity_score(audio_path, prompt),
         fad=None,
     )
-
 
 
 def summarize_results(rows: list[dict]) -> list[dict]:
@@ -101,6 +95,7 @@ def summarize_results(rows: list[dict]) -> list[dict]:
     ]
     summary_rows: list[dict] = []
     grouped = frame.groupby(["condition", "prompt_id"], dropna=False)
+
     for (condition, prompt_id), group in grouped:
         summary: dict[str, object] = {
             "row_type": "prompt_summary",
@@ -108,15 +103,19 @@ def summarize_results(rows: list[dict]) -> list[dict]:
             "prompt_id": prompt_id,
             "seed": "all",
             "audio_path": "",
+            "raw_prompt": group["raw_prompt"].iloc[0] if "raw_prompt" in group.columns else "",
             "prompt_text": group["prompt_text"].iloc[0],
+            "reasoning": "",
+            "reasoning_tags": "",
+            "structured_json": "",
         }
         for column in numeric_columns:
             values = pd.to_numeric(group[column], errors="coerce")
             summary[f"{column}_mean"] = float(values.mean()) if values.notna().any() else None
             summary[f"{column}_variance"] = float(values.var(ddof=0)) if values.notna().any() else None
         summary_rows.append(summary)
-    return summary_rows
 
+    return summary_rows
 
 
 def write_results(rows: list[dict], output_csv: Path) -> None:
@@ -127,7 +126,11 @@ def write_results(rows: list[dict], output_csv: Path) -> None:
         "prompt_id",
         "seed",
         "audio_path",
+        "raw_prompt",
         "prompt_text",
+        "reasoning",
+        "reasoning_tags",
+        "structured_json",
         "loudness_variance",
         "spectral_centroid_variance",
         "embedding_similarity",
@@ -148,14 +151,12 @@ def write_results(rows: list[dict], output_csv: Path) -> None:
             writer.writerow(row)
 
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True, help="JSON manifest with per-audio experiment rows.")
     parser.add_argument("--output", type=Path, required=True, help="Destination CSV for detailed and summary metrics.")
     parser.add_argument("--background-dir", type=Path, default=None, help="Optional reference directory for FAD.")
     return parser.parse_args()
-
 
 
 def main() -> None:

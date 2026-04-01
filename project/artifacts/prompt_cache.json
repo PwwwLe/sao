@@ -1,0 +1,341 @@
+{
+  "nature": {
+    "baseline": {
+      "raw_prompt": "forest ambience, birds chirping, light wind, leaves rustling, calm atmosphere",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "forest ambience, birds chirping, light wind, leaves rustling, calm atmosphere",
+      "structured_json": null
+    },
+    "structured": {
+      "raw_prompt": "forest ambience, birds chirping, light wind, leaves rustling, calm atmosphere",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "Environment: forest | Time: | Weather: light wind | Sounds: birds chirping; leaves rustling | Spatial: open; mid; wide | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "birds chirping",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "open",
+        "sao_prompt": "Environment: forest | Time: | Weather: light wind | Sounds: birds chirping; leaves rustling | Spatial: open; mid; wide | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: | Quality: high-quality, stereo",
+        "stereo_width": "wide",
+        "mood": "calm",
+        "acoustic_properties": "",
+        "environment": "forest",
+        "audio_type": "AMBIENCE",
+        "weather": "light wind",
+        "distance_profile": "mid",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "leaves rustling",
+        "time_of_day": "",
+        "temporal_evolution": "static"
+      }
+    },
+    "cot": {
+      "raw_prompt": "forest ambience, birds chirping, light wind, leaves rustling, calm atmosphere",
+      "reasoning": "{\"bed_layer\": \"\", \"foreground_background_tendency\": \"\", \"control_decisions\": [\"avoid close bird chirps\", \"keep wind speed steady\", \"use wide stereo for leaves rustling\"], \"dynamic_layer\": \"\", \"stationarity_variability\": \"\", \"spot_layer\": \"\", \"scene_family\": \"forest\", \"loopability_risk\": \"\"}",
+      "reasoning_tags": "bird chirping; wind rustling; calm atmosphere",
+      "final_prompt": "Environment: forest | Time: | Weather: light wind | Sounds: birds chirping; leaves rustling | Spatial: open; mid; moderate | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: forest; bird chirping; wind rustling; calm atmosphere; avoid close bird chirps; keep wind speed steady; use wide stereo for leaves rustling | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "birds chirping",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "open",
+        "sao_prompt": "Environment: forest | Time: | Weather: light wind | Sounds: birds chirping; leaves rustling | Spatial: open; mid; moderate | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: forest; bird chirping; wind rustling; calm atmosphere; avoid close bird chirps; keep wind speed steady; use wide stereo for leaves rustling | Quality: high-quality, stereo",
+        "stereo_width": "moderate",
+        "mood": "calm",
+        "acoustic_properties": "",
+        "environment": "forest",
+        "audio_type": "AMBIENCE",
+        "weather": "light wind",
+        "distance_profile": "mid",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "leaves rustling",
+        "time_of_day": "",
+        "temporal_evolution": "static",
+        "cot_trace": {
+          "bed_layer": "",
+          "foreground_background_tendency": "",
+          "control_decisions": [
+            "avoid close bird chirps",
+            "keep wind speed steady",
+            "use wide stereo for leaves rustling"
+          ],
+          "dynamic_layer": "",
+          "stationarity_variability": "",
+          "spot_layer": "",
+          "scene_family": "forest",
+          "loopability_risk": ""
+        },
+        "reasoning_tags": [
+          "bird chirping",
+          "wind rustling",
+          "calm atmosphere"
+        ]
+      }
+    }
+  },
+  "urban": {
+    "baseline": {
+      "raw_prompt": "night city ambience, distant traffic, occasional siren, quiet streets, calm mood",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "night city ambience, distant traffic, occasional siren, quiet streets, calm mood",
+      "structured_json": null
+    },
+    "structured": {
+      "raw_prompt": "night city ambience, distant traffic, occasional siren, quiet streets, calm mood",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "Environment: city | Time: night | Weather: clear | Sounds: distant traffic; occasional siren | Spatial: quiet streets; far | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "distant traffic",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "quiet streets",
+        "sao_prompt": "Environment: city | Time: night | Weather: clear | Sounds: distant traffic; occasional siren | Spatial: quiet streets; far | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: | Quality: high-quality, stereo",
+        "stereo_width": "",
+        "mood": "calm",
+        "acoustic_properties": "",
+        "environment": "city",
+        "audio_type": "AMBIENCE",
+        "weather": "clear",
+        "distance_profile": "far",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "occasional siren",
+        "time_of_day": "night",
+        "temporal_evolution": "static"
+      }
+    },
+    "cot": {
+      "raw_prompt": "night city ambience, distant traffic, occasional siren, quiet streets, calm mood",
+      "reasoning": "{\"bed_layer\": \"\", \"foreground_background_tendency\": \"calm\", \"control_decisions\": [\"avoid close traffic noise\", \"minimize siren exposure\", \"use wide stereo for distant traffic\"], \"dynamic_layer\": \"\", \"stationarity_variability\": \"low\", \"spot_layer\": \"\", \"scene_family\": \"city\", \"loopability_risk\": \"low\"}",
+      "reasoning_tags": "calm; city; distant traffic; occasional siren; quiet streets",
+      "final_prompt": "Environment: city | Time: night | Weather: clear | Sounds: distant traffic; occasional siren | Spatial: quiet streets; far; moderate | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: city; calm; low; low; calm; city; distant traffic; occasional siren; quiet streets; avoid close traffic noise; minimize siren exposure; use wide stereo for distant traffic | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "distant traffic",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "quiet streets",
+        "sao_prompt": "Environment: city | Time: night | Weather: clear | Sounds: distant traffic; occasional siren | Spatial: quiet streets; far; moderate | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: city; calm; low; low; calm; city; distant traffic; occasional siren; quiet streets; avoid close traffic noise; minimize siren exposure; use wide stereo for distant traffic | Quality: high-quality, stereo",
+        "stereo_width": "moderate",
+        "mood": "calm",
+        "acoustic_properties": "",
+        "environment": "city",
+        "audio_type": "AMBIENCE",
+        "weather": "clear",
+        "distance_profile": "far",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "occasional siren",
+        "time_of_day": "night",
+        "temporal_evolution": "static",
+        "cot_trace": {
+          "bed_layer": "",
+          "foreground_background_tendency": "calm",
+          "control_decisions": [
+            "avoid close traffic noise",
+            "minimize siren exposure",
+            "use wide stereo for distant traffic"
+          ],
+          "dynamic_layer": "",
+          "stationarity_variability": "low",
+          "spot_layer": "",
+          "scene_family": "city",
+          "loopability_risk": "low"
+        },
+        "reasoning_tags": [
+          "calm",
+          "city",
+          "distant traffic",
+          "occasional siren",
+          "quiet streets"
+        ]
+      }
+    }
+  },
+  "indoor": {
+    "baseline": {
+      "raw_prompt": "library ambience, page turning, soft footsteps, quiet environment, low noise",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "library ambience, page turning, soft footsteps, quiet environment, low noise",
+      "structured_json": null
+    },
+    "structured": {
+      "raw_prompt": "library ambience, page turning, soft footsteps, quiet environment, low noise",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "Environment: | Time: | Weather: | Sounds: page turning; soft footsteps | Spatial: quiet environment; low noise | Temporal: | Acoustics: | Mood: | Style: | Details: | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "page turning",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "quiet environment",
+        "sao_prompt": "Environment: | Time: | Weather: | Sounds: page turning; soft footsteps | Spatial: quiet environment; low noise | Temporal: | Acoustics: | Mood: | Style: | Details: | Quality: high-quality, stereo",
+        "stereo_width": "",
+        "mood": "",
+        "acoustic_properties": "",
+        "environment": "",
+        "audio_type": "AMBIENCE",
+        "weather": "",
+        "distance_profile": "low noise",
+        "negative_prompt": "",
+        "event_density": "",
+        "recording_style": "",
+        "immersion_level": "",
+        "sound_sources_secondary": "soft footsteps",
+        "time_of_day": "",
+        "temporal_evolution": ""
+      }
+    },
+    "cot": {
+      "raw_prompt": "library ambience, page turning, soft footsteps, quiet environment, low noise",
+      "reasoning": "{\"bed_layer\": \"\", \"foreground_background_tendency\": \"\", \"control_decisions\": [\"minimize page turning noise\", \"use soft floor materials to reduce footsteps noise\", \"place sound sources away from the listener\"], \"dynamic_layer\": \"\", \"stationarity_variability\": \"\", \"spot_layer\": \"\", \"scene_family\": \"indoor built environment\", \"loopability_risk\": \"\"}",
+      "reasoning_tags": "quiet environment; low noise; page turning; soft footsteps",
+      "final_prompt": "Environment: indoor built environment | Time: | Weather: | Sounds: page turning; soft footsteps | Spatial: quiet environment; close; moderate | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: indoor built environment; quiet environment; low noise; page turning; soft footsteps; minimize page turning noise; use soft floor materials to reduce footsteps noise; place sound sources away from the listener | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "page turning",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "quiet environment",
+        "sao_prompt": "Environment: indoor built environment | Time: | Weather: | Sounds: page turning; soft footsteps | Spatial: quiet environment; close; moderate | Temporal: static; sparse | Acoustics: | Mood: calm | Style: | Details: indoor built environment; quiet environment; low noise; page turning; soft footsteps; minimize page turning noise; use soft floor materials to reduce footsteps noise; place sound sources away from the listener | Quality: high-quality, stereo",
+        "stereo_width": "moderate",
+        "mood": "calm",
+        "acoustic_properties": "",
+        "environment": "indoor built environment",
+        "audio_type": "AMBIENCE",
+        "weather": "",
+        "distance_profile": "close",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "soft footsteps",
+        "time_of_day": "",
+        "temporal_evolution": "static",
+        "cot_trace": {
+          "bed_layer": "",
+          "foreground_background_tendency": "",
+          "control_decisions": [
+            "minimize page turning noise",
+            "use soft floor materials to reduce footsteps noise",
+            "place sound sources away from the listener"
+          ],
+          "dynamic_layer": "",
+          "stationarity_variability": "",
+          "spot_layer": "",
+          "scene_family": "indoor built environment",
+          "loopability_risk": ""
+        },
+        "reasoning_tags": [
+          "quiet environment",
+          "low noise",
+          "page turning",
+          "soft footsteps"
+        ]
+      }
+    }
+  },
+  "acoustic-heavy": {
+    "baseline": {
+      "raw_prompt": "cave ambience, water dripping, echo reflections, dark enclosed space, sparse sound",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "cave ambience, water dripping, echo reflections, dark enclosed space, sparse sound",
+      "structured_json": null
+    },
+    "structured": {
+      "raw_prompt": "cave ambience, water dripping, echo reflections, dark enclosed space, sparse sound",
+      "reasoning": null,
+      "reasoning_tags": null,
+      "final_prompt": "Environment: cave | Time: | Weather: | Sounds: water dripping; echo reflections | Spatial: enclosed; close; narrow | Temporal: sparse | Acoustics: | Mood: dark | Style: | Details: | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "water dripping",
+        "background_textures": "echo reflections",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "enclosed",
+        "sao_prompt": "Environment: cave | Time: | Weather: | Sounds: water dripping; echo reflections | Spatial: enclosed; close; narrow | Temporal: sparse | Acoustics: | Mood: dark | Style: | Details: | Quality: high-quality, stereo",
+        "stereo_width": "narrow",
+        "mood": "dark",
+        "acoustic_properties": "",
+        "environment": "cave",
+        "audio_type": "AMBIENCE",
+        "weather": "",
+        "distance_profile": "close",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "",
+        "time_of_day": "",
+        "temporal_evolution": ""
+      }
+    },
+    "cot": {
+      "raw_prompt": "cave ambience, water dripping, echo reflections, dark enclosed space, sparse sound",
+      "reasoning": "{\"bed_layer\": \"\", \"foreground_background_tendency\": \"\", \"control_decisions\": [\"avoid close water droplets\", \"minimize echo reflections\", \"keep sound sources sparse\"], \"dynamic_layer\": \"\", \"stationarity_variability\": \"\", \"spot_layer\": \"\", \"scene_family\": \"natural outdoors\", \"loopability_risk\": \"\"}",
+      "reasoning_tags": "dark enclosed space; water dripping; reverb, reflections",
+      "final_prompt": "Environment: cave | Time: | Weather: | Sounds: water dripping | Spatial: enclosed; close; narrow | Temporal: sparse | Acoustics: reverb, reflections | Mood: dark | Style: | Details: natural outdoors; dark enclosed space; water dripping; reverb, reflections; avoid close water droplets; minimize echo reflections; keep sound sources sparse | Quality: high-quality, stereo",
+      "structured_json": {
+        "sound_sources_primary": "water dripping",
+        "background_textures": "",
+        "looping": "",
+        "duration_hint": "",
+        "spatial_characteristics": "enclosed",
+        "sao_prompt": "Environment: cave | Time: | Weather: | Sounds: water dripping | Spatial: enclosed; close; narrow | Temporal: sparse | Acoustics: reverb, reflections | Mood: dark | Style: | Details: natural outdoors; dark enclosed space; water dripping; reverb, reflections; avoid close water droplets; minimize echo reflections; keep sound sources sparse | Quality: high-quality, stereo",
+        "stereo_width": "narrow",
+        "mood": "dark",
+        "acoustic_properties": "reverb, reflections",
+        "environment": "cave",
+        "audio_type": "AMBIENCE",
+        "weather": "",
+        "distance_profile": "close",
+        "negative_prompt": "",
+        "event_density": "sparse",
+        "recording_style": "",
+        "immersion_level": "background",
+        "sound_sources_secondary": "",
+        "time_of_day": "",
+        "temporal_evolution": "",
+        "cot_trace": {
+          "bed_layer": "",
+          "foreground_background_tendency": "",
+          "control_decisions": [
+            "avoid close water droplets",
+            "minimize echo reflections",
+            "keep sound sources sparse"
+          ],
+          "dynamic_layer": "",
+          "stationarity_variability": "",
+          "spot_layer": "",
+          "scene_family": "natural outdoors",
+          "loopability_risk": ""
+        },
+        "reasoning_tags": [
+          "dark enclosed space",
+          "water dripping",
+          "reverb, reflections"
+        ]
+      }
+    }
+  }
+}
